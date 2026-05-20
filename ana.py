@@ -202,8 +202,11 @@ def speak_text(text):
                 subprocess.run(["spd-say", "-o", "espeak-ng", "-y", "sw+f3", "-t", "female2", "-l", "sw"], input=clean_text.encode("utf-8"), check=False)
             except Exception:
                 speak_text_google(clean_text)
+    elif provider == "elevenlabs" or provider == "eleven":
+        speak_text_elevenlabs(clean_text)
     else:
         speak_text_google(clean_text)
+
 
 def speak_text_google(clean_text):
     """Synthesize Swahili speech using Google Translate TTS API and play natively via VLC."""
@@ -274,7 +277,75 @@ def speak_text_google(clean_text):
         except Exception:
             pass
 
-
+def speak_text_elevenlabs(clean_text):
+    """Synthesize Swahili speech using ElevenLabs API and play natively via VLC."""
+    api_key = os.environ.get("ELEVENLABS_API_KEY")
+    if not api_key:
+        print(f"{C_YELLOW}[!] ELEVENLABS_API_KEY haipo kwenye faili la .env. Inajielekeza kwa Google...{C_RESET}")
+        speak_text_google(clean_text)
+        return
+        
+    voice_id = os.environ.get("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM") # Rachel default
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+    
+    payload = {
+        "text": clean_text,
+        "model_id": "eleven_multilingual_v2",
+        "voice_settings": {
+            "stability": 0.5,
+            "similarity_boost": 0.75
+        }
+    }
+    
+    req_data = json.dumps(payload).encode('utf-8')
+    req = urllib.request.Request(
+        url,
+        data=req_data,
+        headers={
+            "xi-api-key": api_key,
+            "Content-Type": "application/json"
+        },
+        method="POST"
+    )
+    
+    temp_file = os.path.join(os.path.dirname(__file__), "temp_tts.mp3")
+    system = platform.system()
+    
+    try:
+        with urllib.request.urlopen(req) as response:
+            with open(temp_file, "wb") as f:
+                f.write(response.read())
+                
+        # Play the audio using VLC
+        if system == "Windows":
+            vlc_paths = [
+                r"C:\Program Files\VideoLAN\VLC\vlc.exe",
+                r"C:\Program Files (x86)\VideoLAN\VLC\vlc.exe"
+            ]
+            vlc_found = None
+            for path in vlc_paths:
+                if os.path.exists(path):
+                    vlc_found = path
+                    break
+            if vlc_found:
+                os.system(f'"{vlc_found}" --play-and-exit "{temp_file}" >nul 2>nul')
+            else:
+                import subprocess
+                ps_text = clean_text.replace("'", "''").replace('"', '`"')
+                cmd = f"Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; $s.Speak('{ps_text}')"
+                subprocess.run(["powershell", "-Command", cmd], check=False)
+        else:
+            os.system(f"cvlc --play-and-exit '{temp_file}' >/dev/null 2>&1")
+            
+    except Exception as e:
+        print(f"{C_RED}[!] Hitilafu ya ElevenLabs: {e}. Inatumia Google...{C_RESET}")
+        speak_text_google(clean_text)
+        
+    if os.path.exists(temp_file):
+        try:
+            os.remove(temp_file)
+        except Exception:
+            pass
 
 def generate_response(messages, stream=True):
     """Query selected engine (Ollama, Groq, or OpenRouter) with stream support and dynamic time injection."""
@@ -414,7 +485,12 @@ def main():
 
     # Interactive Chat Mode
     tts_provider = os.environ.get("TTS_PROVIDER", "google").lower()
-    provider_name = "Google Cloud Neural (Mwanamke Sanifu)" if tts_provider == "google" else "Local spd-say (Mwanamke female2)"
+    if tts_provider in ["elevenlabs", "eleven"]:
+        provider_name = "ElevenLabs Ultra-Realistic (Mwanamke)"
+    elif tts_provider == "google":
+        provider_name = "Google Cloud Neural (Mwanamke Sanifu)"
+    else:
+        provider_name = "Local spd-say/SAPI5 (Mwanamke)"
     print(f"{C_GRAY}Mawasiliano salama yameanzishwa. Andika 'exit' au 'ondoka' kumaliza mazungumzo.{C_RESET}")
     print(f"{C_GRAY}Sauti (TTS): {C_BOLD}{'IMEWASHWA (' + provider_name + ')' if SPEAK_ENABLED else 'IMEZIMWA (Andika -s kuwasha)'}{C_RESET}")
     print(f"{C_GRAY}Njia ya CPU: {C_BOLD}{'Inatumia Cloud API (0% CPU)' if MODEL_ENGINE != 'local' else 'Inatumia CPU ya Ndani (100% CPU)'}{C_RESET}\n")

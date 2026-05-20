@@ -12,8 +12,10 @@ A.N.A (Ana Neural Assistant) ni mfumo wa msaidizi wa kibinafsi wa hali ya juu (S
    * **Njia ya Ndani (Ollama Offline Fallback):** Inajielekeza yenyewe kutumia Ollama na model ndogo ya CPU-optimized `gemma2-swahili` (2B Q4_K_M) iwapo hauna mtandao au funguo za API.
 
 2. **Sauti ya Kiswahili ya Mwanamke (Female Swahili TTS Voice):**
-   * **Google Cloud Neural TTS:** Sauti nzuri sana, yenye hisia, inayotiririka na kusikika kama mwanamke halisi anayeongea Kiswahili sanifu (Inahitaji mtandao).
-   * **Local spd-say (Offline Variant):** Sauti ya ndani ya Linux iliyowekewa nguvu ya kipekee ya `espeak-ng sw+f3` ili kulazimisha mfumo kuongea kwa sauti ya kike yenye kiwango cha wastani badala ya sauti ya kiume ya roboti.
+   * **ElevenLabs Ultra-Realistic:** Sauti inayofanana kabisa na ya binadamu halisi kwa 100% yenye uwezo mkubwa wa hisia. Inatumia ElevenLabs Multilingual V2 (Inahitaji ufunguo wa ElevenLabs API).
+   * **Google Cloud Neural TTS:** Sauti nzuri sana, yenye hisia, inayotiririka na kusikika kama mwanamke halisi anayeongea Kiswahili sanifu (BURE kabisa na inahitaji mtandao).
+   * **Local spd-say (Offline Variant):** Sauti ya ndani ya Linux iliyowekewa nguvu ya kipekee ya `espeak-ng sw+f3` au SAPI5 (Windows) ili kulazimisha mfumo kuongea kwa sauti ya kike badala ya sauti ya kiume ya roboti.
+
 
 3. **Dynamic Prompt Engineering & Personas:**
    * Mfumo unapakia profiles za **JSON** kutoka folda la `personas/` ili kubadilisha tabia na utaalamu wa A.N.A papo hapo.
