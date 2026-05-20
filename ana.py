@@ -285,7 +285,7 @@ def speak_text_elevenlabs(clean_text):
         speak_text_google(clean_text)
         return
         
-    voice_id = os.environ.get("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM") # Rachel default
+    voice_id = os.environ.get("ELEVENLABS_VOICE_ID", "FZGeNF7bE3syeQOynDKC") # Victoria default
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
     
     payload = {
