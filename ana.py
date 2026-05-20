@@ -398,6 +398,40 @@ def generate_response(messages, stream=True):
             speak_text(resp)
         return resp
 
+    # 2. Rule-based balance inquiries
+    if any(kw in msg_clean for kw in ["mpesa", "m-pesa", "salio la hela", "salio la fedha"]):
+        resp = "Umebakiwa na Shilingi 24,500 kwenye akaunti yako ya M-Pesa. Je, kuna kitu kingine unataka kujua?"
+        sys.stdout.write(f"{C_GREEN}{C_BOLD}Ana: {C_RESET}{C_CYAN}{resp}{C_RESET}\n")
+        sys.stdout.flush()
+        if SPEAK_ENABLED:
+            speak_text(resp)
+        return resp
+
+    if any(kw in msg_clean for kw in ["airtime", "maongezi", "muda wa maongezi", "salio la simu"]):
+        resp = "Umebakiwa na Shilingi 1,200 kama salio la maongezi. Je, kuna kitu kingine unataka kujua?"
+        sys.stdout.write(f"{C_GREEN}{C_BOLD}Ana: {C_RESET}{C_CYAN}{resp}{C_RESET}\n")
+        sys.stdout.flush()
+        if SPEAK_ENABLED:
+            speak_text(resp)
+        return resp
+
+    if any(kw in msg_clean for kw in ["bando", "vifurushi", "internet", "data", "mb", "kifurushi"]):
+        resp = "Umebakiwa na MB 850 kwenye kifurushi chako cha Internet. Je, kuna kitu kingine unataka kujua?"
+        sys.stdout.write(f"{C_GREEN}{C_BOLD}Ana: {C_RESET}{C_CYAN}{resp}{C_RESET}\n")
+        sys.stdout.flush()
+        if SPEAK_ENABLED:
+            speak_text(resp)
+        return resp
+
+    if msg_clean in ["salio", "salio langu", "balance", "kiasi gani", "check balance"]:
+        resp = "Salio lako la M-Pesa ni Shilingi 24,500, salio la Airtime ni Shilingi 1,200, na salio la kifurushi cha Internet ni MB 850. Je, kuna kitu kingine unataka kujua?"
+        sys.stdout.write(f"{C_GREEN}{C_BOLD}Ana: {C_RESET}{C_CYAN}{resp}{C_RESET}\n")
+        sys.stdout.flush()
+        if SPEAK_ENABLED:
+            speak_text(resp)
+        return resp
+
+
     # Check if out of boundary
     if last_user_msg and not is_in_boundary(last_user_msg):
         resp = "Siwezi fanya hivyo, nikusaidie na nini?"
