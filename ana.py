@@ -382,8 +382,8 @@ def generate_response(messages, stream=True):
     msg_clean = last_user_msg.lower().rstrip(".?! ")
     
     # 1. Rule-based closures
-    if msg_clean in ["asante", "shukrani", "thank you", "thanks", "asante sana", "shukrani sana", "aksante", "shukurani"]:
-        resp = "Asante kwa muda wako, je kuna kitu kingine ningekusaidia?"
+    if msg_clean in ["asante", "shukrani", "thank you", "thanks", "asante sana", "shukrani sana", "aksante", "shukurani", "ok sawa", "sawa asante", "sawa shukrani"]:
+        resp = "Asante kwa muda wako, karibu tena."
         sys.stdout.write(f"{C_GREEN}{C_BOLD}Ana: {C_RESET}{C_CYAN}{resp}{C_RESET}\n")
         sys.stdout.flush()
         if SPEAK_ENABLED:
@@ -817,6 +817,11 @@ def run_api_server(port=5000):
                 # Get telemetry logs
                 logs, telemetry = generate_chat_telemetry(message, response_text, persona_id)
 
+                should_close = response_text in [
+                    "Asante kwa muda wako, karibu tena.",
+                    "Sawa, karibu tena."
+                ]
+
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
                 send_cors_headers(self)
@@ -825,7 +830,8 @@ def run_api_server(port=5000):
                 result = {
                     "response": response_text,
                     "logs": logs,
-                    "telemetry": telemetry
+                    "telemetry": telemetry,
+                    "should_close": should_close
                 }
                 self.wfile.write(json.dumps(result).encode('utf-8'))
             else:

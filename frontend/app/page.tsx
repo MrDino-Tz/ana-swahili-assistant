@@ -51,6 +51,8 @@ export default function ANAApp() {
   const finalTranscriptRef = React.useRef('');
   const hasSentRef = React.useRef(false);
   const handleSendRef = React.useRef<any>(null);
+  const silenceTimeoutRef = React.useRef<any>(null);
+  const shouldCloseRef = React.useRef(false);
 
   // Logs & Telemetry
   const [logs, setLogs] = useState<LogItem[]>([
@@ -88,7 +90,19 @@ export default function ANAApp() {
     handleSendRef.current = handleSend;
   }, [handleSend]);
 
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (silenceTimeoutRef.current) {
+        clearTimeout(silenceTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleMicClick = () => {
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
+    }
     if (!hasGreeted) {
       if (audioElement) {
         audioElement.pause();
@@ -98,6 +112,7 @@ export default function ANAApp() {
       setResponse(greetText);
       setIsLoading(true);
       setHasGreeted(true);
+      shouldCloseRef.current = false;
 
       const audioUrl = `/api/tts?text=${encodeURIComponent(greetText)}`;
       const newAudio = new Audio(audioUrl);
@@ -137,15 +152,31 @@ export default function ANAApp() {
         rec.interimResults = true;
         rec.lang = 'sw-TZ'; // Swahili - Tanzania / Kenya
 
+        const resetSilenceTimer = () => {
+          if (silenceTimeoutRef.current) {
+            clearTimeout(silenceTimeoutRef.current);
+          }
+          silenceTimeoutRef.current = setTimeout(() => {
+            console.log("No speech input for 5 seconds, stopping recognition.");
+            setTranscription("Muda umekwisha. Mazungumzo yamesitishwa.");
+            setIsListening(false);
+            try {
+              rec.stop();
+            } catch (e) {}
+          }, 5000);
+        };
+
         rec.onstart = () => {
           setIsListening(true);
           setTranscription('Ninakusikiliza, ongea sasa...');
           setResponse('');
           finalTranscriptRef.current = '';
           hasSentRef.current = false;
+          resetSilenceTimer();
         };
 
         rec.onresult = (event: any) => {
+          resetSilenceTimer();
           let interimTranscript = '';
           let finalTranscript = '';
 
@@ -168,6 +199,9 @@ export default function ANAApp() {
         rec.onerror = (event: any) => {
           console.error("Speech recognition error", event.error);
           setIsListening(false);
+          if (silenceTimeoutRef.current) {
+            clearTimeout(silenceTimeoutRef.current);
+          }
           if (event.error === 'no-speech') {
             setTranscription('Sikupata sauti. Tafadhali bonyeza mic na ujaribu tena.');
           } else {
@@ -177,6 +211,9 @@ export default function ANAApp() {
 
         rec.onend = () => {
           setIsListening(false);
+          if (silenceTimeoutRef.current) {
+            clearTimeout(silenceTimeoutRef.current);
+          }
           // Only send if we have a valid accumulated final transcript and haven't sent it yet
           const finalVal = finalTranscriptRef.current;
           if (finalVal && !hasSentRef.current) {
@@ -215,6 +252,9 @@ export default function ANAApp() {
 
   async function handleSend(messageText: string) {
     if (!messageText.trim()) return;
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
+    }
     setIsLoading(true);
     setTranscription(messageText);
     setResponse('');
@@ -249,6 +289,7 @@ export default function ANAApp() {
 
       const data = await res.json();
       setResponse(data.response);
+      shouldCloseRef.current = !!data.should_close;
 
       // Dynamically load logs and telemetry
       if (data.telemetry) {
@@ -273,6 +314,15 @@ export default function ANAApp() {
       const newAudio = new Audio(audioUrl);
       setAudioElement(newAudio);
       newAudio.play().catch(err => console.error("Audio playback interrupted/blocked by browser autoplay rules:", err));
+
+      newAudio.onended = () => {
+        setIsLoading(false);
+        if (!shouldCloseRef.current && !showTextInput) {
+          setIsListening(true);
+        } else {
+          setIsListening(false);
+        }
+      };
 
     } catch (error) {
       console.error(error);
