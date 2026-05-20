@@ -40,7 +40,7 @@ BANNER = f"""{C_CYAN}{C_BOLD}
   ███    ███  ███   ███   ███    ███ 
   ███    ███  ███   ███   ███    ███ 
   ███    █▀    ▀█   █▀    ███    █▀  
-{C_MAGENTA}{C_BOLD}  ──  ANA NEURAL ASSISTANT (HYBRID SWAHILI CORE)  ──
+{C_MAGENTA}{C_BOLD}  ──  Ana Neural Assistant (Hybrid Swahili Core)  ──
 {C_RESET}"""
 
 # Global configuration
@@ -50,7 +50,7 @@ API_KEY = ""
 API_URL = ""
 SPEAK_ENABLED = False
 
-SYSTEM_PROMPT = "Wewe ni A.N.A (Ana Neural Assistant), Msaidizi Binafsi wa kidijitali aliyebobea kusaidia mtumiaji kusimamia majukumu, kupanga siku yake, kutatua changamoto za kiufundi, na kutoa ushauri wa kimaisha na kikazi. Unajieleza kwa lugha ya Kiswahili sanifu, chenye adabu, heshima na uelewa mkubwa wa utamaduni wa Afrika Mashariki. Kuwa makini, tayari kuandaa barua pepe, kupanga ratiba za siku, kufanya muhtasari wa nyaraka, na kuleta ufanisi mkubwa katika kila jukumu la mteja wako."
+SYSTEM_PROMPT = "Wewe ni Ana (Ana Neural Assistant), Msaidizi Binafsi wa kidijitali aliyebobea kusaidia mtumiaji kusimamia majukumu, kupanga siku yake, kutatua changamoto za kiufundi, na kutoa ushauri wa kimaisha na kikazi. Unajieleza kwa lugha ya Kiswahili sanifu, chenye adabu, heshima na uelewa mkubwa wa utamaduni wa Afrika Mashariki. Kuwa makini, tayari kuandaa barua pepe, kupanga ratiba za siku, kufanya muhtasari wa nyaraka, na kuleta ufanisi mkubwa katika kila jukumu la mteja wako."
 
 def load_dotenv():
     """Load configuration from local .env file securely without python-dotenv."""
@@ -396,7 +396,7 @@ def generate_response(messages, stream=True):
     
     try:
         with urllib.request.urlopen(req) as response:
-            sys.stdout.write(f"{C_GREEN}{C_BOLD}A.N.A: {C_RESET}{C_CYAN}")
+            sys.stdout.write(f"{C_GREEN}{C_BOLD}Ana: {C_RESET}{C_CYAN}")
             sys.stdout.flush()
             
             full_response = ""
@@ -504,7 +504,7 @@ def main():
                 continue
                 
             if user_input.lower() in ['exit', 'quit', 'ondoka', 'kwaheri']:
-                print(f"\n{C_MAGENTA}{C_BOLD}A.N.A: Kwaheri! Tutaonana tena.{C_RESET}\n")
+                print(f"\n{C_MAGENTA}{C_BOLD}Ana: Kwaheri! Tutaonana tena.{C_RESET}\n")
                 
                 # Say goodbye in Swahili if speak is enabled!
                 if SPEAK_ENABLED:
@@ -520,7 +520,7 @@ def main():
             print()
             
         except (KeyboardInterrupt, EOFError):
-            print(f"\n\n{C_MAGENTA}{C_BOLD}A.N.A: Mazungumzo yamefungwa. Kwaheri!{C_RESET}\n")
+            print(f"\n\n{C_MAGENTA}{C_BOLD}Ana: Mazungumzo yamefungwa. Kwaheri!{C_RESET}\n")
             if SPEAK_ENABLED:
                 speak_text("Mazungumzo yamefungwa. Kwaheri!")
             break
