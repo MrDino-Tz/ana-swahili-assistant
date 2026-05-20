@@ -696,13 +696,14 @@ def generate_chat_telemetry(message, response, persona_id):
 
 def run_api_server(port=5000):
     """Run built-in standard library HTTP server with CORS enabled."""
-    from http.server import HTTPServer, BaseHTTPRequestHandler
+    from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
     import urllib.parse
     
     def send_cors_headers(handler):
         handler.send_header('Access-Control-Allow-Origin', '*')
         handler.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         handler.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        handler.send_header('Connection', 'close')
 
     class SwahiliAssistantRequestHandler(BaseHTTPRequestHandler):
         def do_OPTIONS(self):
@@ -711,138 +712,162 @@ def run_api_server(port=5000):
             self.end_headers()
 
         def do_GET(self):
-            parsed_path = urllib.parse.urlparse(self.path)
-            path = parsed_path.path
-            query = urllib.parse.parse_qs(parsed_path.query)
+            try:
+                parsed_path = urllib.parse.urlparse(self.path)
+                path = parsed_path.path
+                query = urllib.parse.parse_qs(parsed_path.query)
 
-            if path == "/api/personas":
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json')
-                send_cors_headers(self)
-                self.end_headers()
-                
-                personas = []
-                # Always append the default persona
-                personas.append({
-                    "id": "default",
-                    "name": "Ana Standard",
-                    "description": "Msaidizi mkuu wa Kiswahili binafsi."
-                })
-                
-                personas_dir = os.path.join(os.path.dirname(__file__), "personas")
-                if os.path.exists(personas_dir):
-                    for filename in os.listdir(personas_dir):
-                        if filename.endswith(".json") and filename != "default.json":
-                            p_path = os.path.join(personas_dir, filename)
-                            try:
-                                with open(p_path, "r", encoding="utf-8") as f:
-                                    data = json.load(f)
-                                    personas.append({
-                                        "id": filename[:-5],
-                                        "name": data.get("name", filename[:-5]),
-                                        "description": data.get("description", "")
-                                    })
-                            except Exception:
-                                pass
-                
-                self.wfile.write(json.dumps(personas).encode('utf-8'))
-
-            elif path == "/api/tts":
-                text = query.get("text", [""])[0]
-                if not text:
-                    self.send_response(400)
+                if path == "/api/personas":
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
                     send_cors_headers(self)
                     self.end_headers()
-                    self.wfile.write(b"Missing text parameter")
-                    return
-                
-                self.send_response(200)
-                self.send_header('Content-type', 'audio/mpeg')
-                send_cors_headers(self)
-                self.end_headers()
-                
-                audio_bytes = get_tts_bytes(text)
-                self.wfile.write(audio_bytes)
+                    
+                    personas = []
+                    # Always append the default persona
+                    personas.append({
+                        "id": "default",
+                        "name": "Ana Standard",
+                        "description": "Msaidizi mkuu wa Kiswahili binafsi."
+                    })
+                    
+                    personas_dir = os.path.join(os.path.dirname(__file__), "personas")
+                    if os.path.exists(personas_dir):
+                        for filename in os.listdir(personas_dir):
+                            if filename.endswith(".json") and filename != "default.json":
+                                p_path = os.path.join(personas_dir, filename)
+                                try:
+                                    with open(p_path, "r", encoding="utf-8") as f:
+                                        data = json.load(f)
+                                        personas.append({
+                                            "id": filename[:-5],
+                                            "name": data.get("name", filename[:-5]),
+                                            "description": data.get("description", "")
+                                        })
+                                except Exception:
+                                    pass
+                    
+                    self.wfile.write(json.dumps(personas).encode('utf-8'))
 
-            else:
-                self.send_response(404)
-                send_cors_headers(self)
-                self.end_headers()
-                self.wfile.write(b"Not Found")
+                elif path == "/api/tts":
+                    text = query.get("text", [""])[0]
+                    if not text:
+                        self.send_response(400)
+                        send_cors_headers(self)
+                        self.end_headers()
+                        self.wfile.write(b"Missing text parameter")
+                        return
+                    
+                    self.send_response(200)
+                    self.send_header('Content-type', 'audio/mpeg')
+                    send_cors_headers(self)
+                    self.end_headers()
+                    
+                    audio_bytes = get_tts_bytes(text)
+                    self.wfile.write(audio_bytes)
+
+                else:
+                    self.send_response(404)
+                    send_cors_headers(self)
+                    self.end_headers()
+                    self.wfile.write(b"Not Found")
+            except Exception as e:
+                import traceback
+                print(f"[API Server Error] do_GET failed: {e}")
+                traceback.print_exc()
+                try:
+                    self.send_response(500)
+                    send_cors_headers(self)
+                    self.end_headers()
+                    self.wfile.write(f"Internal server error: {e}".encode('utf-8'))
+                except Exception:
+                    pass
 
         def do_POST(self):
-            parsed_path = urllib.parse.urlparse(self.path)
-            path = parsed_path.path
+            try:
+                parsed_path = urllib.parse.urlparse(self.path)
+                path = parsed_path.path
 
-            if path == "/api/chat":
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
+                if path == "/api/chat":
+                    content_length = int(self.headers['Content-Length'])
+                    post_data = self.rfile.read(content_length)
+                    try:
+                        data = json.loads(post_data.decode('utf-8'))
+                    except Exception:
+                        self.send_response(400)
+                        send_cors_headers(self)
+                        self.end_headers()
+                        self.wfile.write(b"Invalid JSON")
+                        return
+
+                    message = data.get("message", "")
+                    persona_id = data.get("persona", "default")
+                    history = data.get("history", [])
+
+                    if not message:
+                        self.send_response(400)
+                        send_cors_headers(self)
+                        self.end_headers()
+                        self.wfile.write(b"Missing message parameter")
+                        return
+
+                    # Load custom persona prompt
+                    global SYSTEM_PROMPT
+                    original_prompt = SYSTEM_PROMPT
+                    SYSTEM_PROMPT = resolve_persona_prompt(persona_id)
+
+                    # Format chat history
+                    chat_history = []
+                    for h in history:
+                        chat_history.append({"role": h.get("role"), "content": h.get("content")})
+                    chat_history.append({"role": "user", "content": message})
+
+                    # Query LLM (stream=False is required for HTTP response)
+                    response_text = generate_response(chat_history, stream=False)
+
+                    # Restore original prompt
+                    SYSTEM_PROMPT = original_prompt
+
+                    # Get telemetry logs
+                    logs, telemetry = generate_chat_telemetry(message, response_text, persona_id)
+
+                    should_close = response_text in [
+                        "Asante kwa muda wako, karibu tena.",
+                        "Sawa, karibu tena."
+                    ]
+
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    send_cors_headers(self)
+                    self.end_headers()
+
+                    result = {
+                        "response": response_text,
+                        "logs": logs,
+                        "telemetry": telemetry,
+                        "should_close": should_close
+                    }
+                    self.wfile.write(json.dumps(result).encode('utf-8'))
+                else:
+                    self.send_response(404)
+                    send_cors_headers(self)
+                    self.end_headers()
+                    self.wfile.write(b"Not Found")
+            except Exception as e:
+                import traceback
+                print(f"[API Server Error] do_POST failed: {e}")
+                traceback.print_exc()
                 try:
-                    data = json.loads(post_data.decode('utf-8'))
+                    self.send_response(500)
+                    send_cors_headers(self)
+                    self.end_headers()
+                    self.wfile.write(f"Internal server error: {e}".encode('utf-8'))
                 except Exception:
-                    self.send_response(400)
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(b"Invalid JSON")
-                    return
+                    pass
 
-                message = data.get("message", "")
-                persona_id = data.get("persona", "default")
-                history = data.get("history", [])
-
-                if not message:
-                    self.send_response(400)
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(b"Missing message parameter")
-                    return
-
-                # Load custom persona prompt
-                global SYSTEM_PROMPT
-                original_prompt = SYSTEM_PROMPT
-                SYSTEM_PROMPT = resolve_persona_prompt(persona_id)
-
-                # Format chat history
-                chat_history = []
-                for h in history:
-                    chat_history.append({"role": h.get("role"), "content": h.get("content")})
-                chat_history.append({"role": "user", "content": message})
-
-                # Query LLM (stream=False is required for HTTP response)
-                response_text = generate_response(chat_history, stream=False)
-
-                # Restore original prompt
-                SYSTEM_PROMPT = original_prompt
-
-                # Get telemetry logs
-                logs, telemetry = generate_chat_telemetry(message, response_text, persona_id)
-
-                should_close = response_text in [
-                    "Asante kwa muda wako, karibu tena.",
-                    "Sawa, karibu tena."
-                ]
-
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json')
-                send_cors_headers(self)
-                self.end_headers()
-
-                result = {
-                    "response": response_text,
-                    "logs": logs,
-                    "telemetry": telemetry,
-                    "should_close": should_close
-                }
-                self.wfile.write(json.dumps(result).encode('utf-8'))
-            else:
-                self.send_response(404)
-                send_cors_headers(self)
-                self.end_headers()
-                self.wfile.write(b"Not Found")
-
-    print(f"\n{C_CYAN}[A.N.A API Server] Running on http://localhost:{port}{C_RESET}")
+    print(f"\n{C_CYAN}[A.N.A API Server] Running on http://127.0.0.1:{port}{C_RESET}")
     print(f"{C_GRAY}Press Ctrl+C to terminate...{C_RESET}\n")
-    server = HTTPServer(('localhost', port), SwahiliAssistantRequestHandler)
+    server = ThreadingHTTPServer(('127.0.0.1', port), SwahiliAssistantRequestHandler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
