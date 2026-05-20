@@ -6,7 +6,7 @@ This document details the industrial-grade system architecture, database design,
 
 ## ──  1. OVERALL SYSTEM ARCHITECTURE  ──
 
-The architecture follows **Option A (Backend-Centric Neural Voice Pipeline)**. It ensures that heavy processing (Whisper speech-to-text, LLM function parsing, and ElevenLabs/Google voice synthesis) is offloaded entirely to cloud APIs, preserving 0% CPU overhead on both the client device and backend container.
+The architecture follows **Option A (Backend-Centric Neural Voice Pipeline)**. It ensures that heavy processing (Google Cloud STT speech-to-text, LLM function parsing, and ElevenLabs/Google voice synthesis) is offloaded entirely to cloud APIs, preserving 0% CPU overhead on both the client device and backend container.
 
 ```mermaid
 graph TD
@@ -14,7 +14,7 @@ graph TD
     UI[Frontend UI: Web Chat Widget]
     API[FastAPI Backend Server]
     DB[(Mock Telecom CRM Database)]
-    STT[Speech-to-Text: OpenAI Whisper]
+    STT[Speech-to-Text: Google Cloud STT]
     LLM[Swahili LLM Core: Groq Llama-3.3-70B]
     TTS[Text-to-Speech: ElevenLabs Victoria / Google Fallback]
     SMS[Mock SMS Gateway: Background Thread]
@@ -82,11 +82,12 @@ sequenceDiagram
     participant UI as Web Frontend UI
     participant Backend as FastAPI Neural Engine
     participant DB as Mock CRM & Ledger DB
+    participant STT as Speech-to-Text: Google Cloud STT
     participant LLM as Swahili Core LLM
 
     Customer->>UI: Press Mic Button & Speak: "M-Pesa imefungwa!"
     UI->>Backend: Post WAV Audio bytes
-    Backend->>Backend: Convert speech to Swahili Text via Whisper
+    Backend->>Backend: Convert speech to Swahili Text via Google STT
     Backend->>LLM: Pass Swahili Text + vodacom.json Prompt
     LLM-->>Backend: Identify "M-Pesa locked" intent. Request Customer Name
     Backend-->>UI: Return Text + Voice: "Karibu! Ningependa kufahamu jina lako?"
