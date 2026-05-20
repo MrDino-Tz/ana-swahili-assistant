@@ -1,0 +1,12 @@
+[
+  {
+    "role": "user",
+    "content": "mambo",
+    "timestamp": "2026-05-19T21:13:34.785870"
+  },
+  {
+    "role": "assistant",
+    "content": "/desktop_click>{\"x\": 100, \"y\": 100}</desktop_click>",
+    "timestamp": "2026-05-19T21:13:36.183514"
+  }
+]
