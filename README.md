@@ -129,17 +129,27 @@ Ukishaokoa faili hili, unaweza kuliendesha moja kwa moja kwa:
 
 ## 🪟 Usanidi na Matumizi Kwenye Windows (Windows Setup & Execution)
 
-Mradi huu unaoana kikamilifu na mifumo ya **Windows 10 na 11** bila mabadiliko yoyote kwenye code:
+Mradi huu unaoana kikamilifu na mifumo ya **Windows 10 na 11**:
 
 ### 1. Mahitaji ya Windows (Pre-requisites):
 * Sakinisha [Python 3 ya Windows](https://www.python.org/downloads/). Hakikisha unaweka alama ya **"Add Python to PATH"** wakati wa kusakinisha.
 * (Hiari lakini inapendekezwa) Sakinisha VLC Player kwenye Windows ili kucheza sauti ya Google TTS kimya kimya.
+* (Hiari) Sakinisha [Ollama kwa Windows](https://ollama.com/) kama unataka kutumia offline mode.
 
-### 2. Sauti (Text-to-Speech) kwenye Windows:
+### 2. Kupakua Model ya Offline kwenye Windows:
+Kama unataka A.N.A afanye kazi nje ya mtandao na kwa kutumia CPU yako, unaweza kuendesha script ya usanidi wa Windows PowerShell ili kupakua model ya Kiswahili ya `Q4_K_M` (~1.6GB) na kuisajili kwenye Ollama:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\setup.ps1
+```
+
+### 3. Sauti (Text-to-Speech) kwenye Windows:
 * **Google Neural Cloud TTS:** Mfumo utatafuta VLC kwenye Windows (katika Program Files) na kuitumia kucheza sauti ya Kiswahili ya kike sanifu.
 * **Windows Native Offline TTS:** Kama ukiwasha `TTS_PROVIDER=spd-say` au kama hauna VLC, mfumo utatumia huduma ya ndani ya Windows ya **Microsoft SAPI5 (PowerShell Speech Synthesis)** kusema maneno kiotomatiki nje ya mtandao na kwa sauti safi!
 
-### 3. Jinsi ya kuendesha kwenye Windows:
+### 4. Console UTF-8 & Encoding:
+* Mradi unasanidi `stdout` na `stderr` kutumia **UTF-8** kiotomatiki kwenye Windows. Hii inazuia matatizo ya `UnicodeEncodeError` yanayotokana na uchapishaji wa alama maalum au herufi za Kiswahili kwenye PowerShell au CMD.
+
+### 5. Jinsi ya kuendesha kwenye Windows:
 Fungua **PowerShell** au **Command Prompt (cmd)** katika folda la mradi na uendeshe:
 ```powershell
 python ana.py -s
