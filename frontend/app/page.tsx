@@ -36,10 +36,11 @@ export default function ANAApp() {
   const [activeTab, setActiveTab] = useState<'home' | 'activity'>('home');
   const [isListening, setIsListening] = useState(false);
   const [transcription, setTranscription] = useState<string>('');
-  const [response, setResponse] = useState<string>('');
+  const [response, setResponse] = useState<string>('Karibu huduma kwa wateja. Bonyeza kitufe cha MIC hapo chini ili kuanza.');
   const [isLoading, setIsLoading] = useState(false);
   const [textInput, setTextInput] = useState('');
   const [showTextInput, setShowTextInput] = useState(false);
+  const [hasGreeted, setHasGreeted] = useState(false);
 
   // Audio state
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
@@ -87,30 +88,42 @@ export default function ANAApp() {
     handleSendRef.current = handleSend;
   }, [handleSend]);
 
-  // Welcome greeting logic: plays "Karibu huduma kwa wateja, nikusaidie nini?"
-  useEffect(() => {
-    const greetText = "Karibu huduma kwa wateja, nikusaidie nini?";
-    setResponse(greetText);
+  const handleMicClick = () => {
+    if (!hasGreeted) {
+      if (audioElement) {
+        audioElement.pause();
+      }
 
-    // Prepare audio element
-    const audioUrl = `/api/tts?text=${encodeURIComponent(greetText)}`;
-    const newAudio = new Audio(audioUrl);
-    setAudioElement(newAudio);
+      const greetText = "Karibu huduma kwa wateja, nikusaidie nini?";
+      setResponse(greetText);
+      setIsLoading(true);
+      setHasGreeted(true);
 
-    // Try playing the audio on user interaction anywhere on the page
-    const playGreeting = () => {
-      newAudio.play().then(() => {
-        window.removeEventListener('click', playGreeting);
-      }).catch(err => {
-        console.log("Autoplay blocked, waiting for interaction:", err);
+      const audioUrl = `/api/tts?text=${encodeURIComponent(greetText)}`;
+      const newAudio = new Audio(audioUrl);
+      setAudioElement(newAudio);
+
+      newAudio.play().catch(err => {
+        console.error("Audio playback blocked/interrupted:", err);
+        setIsLoading(false);
+        setIsListening(true);
       });
-    };
 
-    window.addEventListener('click', playGreeting);
-    return () => {
-      window.removeEventListener('click', playGreeting);
-    };
-  }, []);
+      newAudio.onended = () => {
+        setIsLoading(false);
+        setIsListening(true);
+      };
+    } else {
+      if (isLoading) {
+        if (audioElement) {
+          audioElement.pause();
+        }
+        setIsLoading(false);
+      } else {
+        setIsListening(prev => !prev);
+      }
+    }
+  };
 
   // Web Speech API
   const [recognition, setRecognition] = useState<any>(null);
@@ -503,7 +516,7 @@ export default function ANAApp() {
 
               {/* The Mic Button itself */}
               <button 
-                onClick={() => setIsListening(!isListening)}
+                onClick={handleMicClick}
                 className="relative z-10 w-16 h-16 rounded-full flex items-center justify-center overflow-hidden border-[3px] border-[#410000] bg-gradient-to-br from-[#e60000] to-[#990000] shadow-[0_0_20px_rgba(230,0,0,0.4)] transition-transform hover:scale-105 active:scale-95 cursor-pointer"
               >
                  <Mic className="w-6 h-6 text-white relative z-10" />
