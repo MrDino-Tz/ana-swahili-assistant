@@ -15,6 +15,12 @@ import argparse
 from datetime import datetime
 import platform
 
+# Enable UTF-8 encoding for stdout and stderr on Windows
+if sys.platform == "win32":
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
 
 OLLAMA_API_URL = "http://localhost:11434/api/chat"
 
@@ -50,7 +56,8 @@ API_KEY = ""
 API_URL = ""
 SPEAK_ENABLED = False
 
-SYSTEM_PROMPT = "Wewe ni Ana (Ana Neural Assistant), Msaidizi Binafsi wa kidijitali aliyebobea kusaidia mtumiaji kusimamia majukumu, kupanga siku yake, kutatua changamoto za kiufundi, na kutoa ushauri wa kimaisha na kikazi. Unajieleza kwa lugha ya Kiswahili sanifu, chenye adabu, heshima na uelewa mkubwa wa utamaduni wa Afrika Mashariki. Kuwa makini, tayari kuandaa barua pepe, kupanga ratiba za siku, kufanya muhtasari wa nyaraka, na kuleta ufanisi mkubwa katika kila jukumu la mteja wako."
+SYSTEM_PROMPT = "Wewe ni Ana (Ana Neural Assistant), mhudumu wa AI wa Huduma kwa Wateja wa mtandao wa simu, aliyetengenezwa kuchukua nafasi ya mifumo ya kizamani ya IVR (Interactive Voice Response). Majibu yako lazima yawe mafupi, mepesi, na ya wazi kabisa kwa sauti (epuka aya ndefu, orodha ndefu na maneno mengi). Mteja akiuliza kuhusu salio lake (salio la maongezi au M-Pesa), mpe majibu kwa ufupi sana: Salio la M-Pesa ni Shilingi 24,500, salio la Airtime ni Shilingi 1,200, na bando la internet lina MB 850. Kwa masuala magumu, kadi iliyofungwa (blocked SIM), au malalamiko nyeti/wizi, mwambie mteja kuwa unamuhamisha kwa mhudumu wa kibinadamu (human agent) kwa usaidizi zaidi na umwambie asubiri kidogo. Mteja akisema 'asante' au 'thank you', jibu neno kwa neno hivi: 'Asante kwa muda wako, je kuna kitu kingine ningekusaidia?' Mteja akisema 'hapana' au 'no', jibu neno kwa neno hivi: 'Sawa, karibu tena.' Mteja akiuliza masuala yoyote yaliyo nje ya mtandao wa simu au yasiyohusiana na huduma za simu/salio/vifurushi/usajili, jibu neno kwa neno hivi pekee: 'Siwezi fanya hivyo, nikusaidie na nini?'"
+
 
 def load_dotenv():
     """Load configuration from local .env file securely without python-dotenv."""
@@ -347,8 +354,93 @@ def speak_text_elevenlabs(clean_text):
         except Exception:
             pass
 
+def is_in_boundary(msg):
+    msg_lower = msg.lower()
+    in_bound_keywords = [
+        "salio", "pesa", "fedha", "shilingi", "tsh", "bando", "mb", "vifurushi", "internet", "data", 
+        "kifurushi", "sajili", "laini", "sim", "namba", "kitambulisho", "nida", "mhudumu", "binadamu", 
+        "agent", "human", "msaada", "hujambo", "habari", "mambo", "hello", "hi", "asante", "thank you", 
+        "shukrani", "thanks", "hapana", "no", "ndio", "yes", "karibu", "saidia", "tuma", "ongea", 
+        "kwanza", "pili", "tatu", "nne", "tano", "sita", "saba", "nane", "tisa", "kumi", "1", "2", "3",
+        "4", "5", "6", "7", "8", "9", "0", "dial", "piga", "namba", "wasiliana"
+    ]
+    if len(msg_lower.strip()) <= 4:
+        return True
+    return any(kw in msg_lower for kw in in_bound_keywords)
+
 def generate_response(messages, stream=True):
     """Query selected engine (Ollama, Groq, or OpenRouter) with stream support and dynamic time injection."""
+    global SPEAK_ENABLED
+    
+    # Extract last user message to check rule-based overrides
+    last_user_msg = ""
+    for m in reversed(messages):
+        if m.get("role") == "user":
+            last_user_msg = m.get("content", "").strip()
+            break
+            
+    msg_clean = last_user_msg.lower().rstrip(".?! ")
+    
+    # 1. Rule-based closures
+    if msg_clean in ["asante", "shukrani", "thank you", "thanks", "asante sana", "shukrani sana", "aksante", "shukurani", "ok sawa", "sawa asante", "sawa shukrani"]:
+        resp = "Asante kwa muda wako, karibu tena."
+        sys.stdout.write(f"{C_GREEN}{C_BOLD}Ana: {C_RESET}{C_CYAN}{resp}{C_RESET}\n")
+        sys.stdout.flush()
+        if SPEAK_ENABLED:
+            speak_text(resp)
+        return resp
+        
+    if msg_clean in ["hapana", "no", "hapana asante", "no thanks", "sihitaji", "nothing"]:
+        resp = "Sawa, karibu tena."
+        sys.stdout.write(f"{C_GREEN}{C_BOLD}Ana: {C_RESET}{C_CYAN}{resp}{C_RESET}\n")
+        sys.stdout.flush()
+        if SPEAK_ENABLED:
+            speak_text(resp)
+        return resp
+
+    # 2. Rule-based balance inquiries
+    if any(kw in msg_clean for kw in ["mpesa", "m-pesa", "salio la hela", "salio la fedha"]):
+        resp = "Umebakiwa na Shilingi 24,500 kwenye akaunti yako ya M-Pesa. Je, kuna kitu kingine unataka kujua?"
+        sys.stdout.write(f"{C_GREEN}{C_BOLD}Ana: {C_RESET}{C_CYAN}{resp}{C_RESET}\n")
+        sys.stdout.flush()
+        if SPEAK_ENABLED:
+            speak_text(resp)
+        return resp
+
+    if any(kw in msg_clean for kw in ["airtime", "maongezi", "muda wa maongezi", "salio la simu"]):
+        resp = "Umebakiwa na Shilingi 1,200 kama salio la maongezi. Je, kuna kitu kingine unataka kujua?"
+        sys.stdout.write(f"{C_GREEN}{C_BOLD}Ana: {C_RESET}{C_CYAN}{resp}{C_RESET}\n")
+        sys.stdout.flush()
+        if SPEAK_ENABLED:
+            speak_text(resp)
+        return resp
+
+    if any(kw in msg_clean for kw in ["bando", "vifurushi", "internet", "data", "mb", "kifurushi"]):
+        resp = "Umebakiwa na MB 850 kwenye kifurushi chako cha Internet. Je, kuna kitu kingine unataka kujua?"
+        sys.stdout.write(f"{C_GREEN}{C_BOLD}Ana: {C_RESET}{C_CYAN}{resp}{C_RESET}\n")
+        sys.stdout.flush()
+        if SPEAK_ENABLED:
+            speak_text(resp)
+        return resp
+
+    if msg_clean in ["salio", "salio langu", "balance", "kiasi gani", "check balance"]:
+        resp = "Salio lako la M-Pesa ni Shilingi 24,500, salio la Airtime ni Shilingi 1,200, na salio la kifurushi cha Internet ni MB 850. Je, kuna kitu kingine unataka kujua?"
+        sys.stdout.write(f"{C_GREEN}{C_BOLD}Ana: {C_RESET}{C_CYAN}{resp}{C_RESET}\n")
+        sys.stdout.flush()
+        if SPEAK_ENABLED:
+            speak_text(resp)
+        return resp
+
+
+    # Check if out of boundary
+    if last_user_msg and not is_in_boundary(last_user_msg):
+        resp = "Siwezi fanya hivyo, nikusaidie na nini?"
+        sys.stdout.write(f"{C_GREEN}{C_BOLD}Ana: {C_RESET}{C_CYAN}{resp}{C_RESET}\n")
+        sys.stdout.flush()
+        if SPEAK_ENABLED:
+            speak_text(resp)
+        return resp
+
     
     # 1. Dynamic Prompt Engineering: Inject real-time local date and time context!
     full_messages = messages.copy()
@@ -451,6 +543,337 @@ def generate_response(messages, stream=True):
         print(f"\n{C_YELLOW}[!] Uingiliaji kati umefanyika. Ninasitisha jibu...{C_RESET}")
         return ""
 
+def get_tts_bytes(text):
+    """Synthesize Swahili speech and return raw MP3 bytes. Supports Google TTS and ElevenLabs."""
+    clean_text = ""
+    in_code = False
+    for line in text.split("\n"):
+        line = line.strip()
+        if line.startswith("```"):
+            in_code = not in_code
+            continue
+        if in_code:
+            continue
+        line = line.replace("*", "").replace("#", "").replace("- ", "").replace("_", "")
+        if line:
+            clean_text += " " + line
+    clean_text = clean_text.strip()
+    if not clean_text:
+        return b""
+
+    provider = os.environ.get("TTS_PROVIDER", "google").lower()
+    if provider in ["elevenlabs", "eleven"]:
+        api_key = os.environ.get("ELEVENLABS_API_KEY")
+        if api_key:
+            voice_id = os.environ.get("ELEVENLABS_VOICE_ID", "FZGeNF7bE3syeQOynDKC")
+            url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+            payload = {
+                "text": clean_text,
+                "model_id": "eleven_multilingual_v2",
+                "voice_settings": {
+                    "stability": 0.5,
+                    "similarity_boost": 0.75
+                }
+            }
+            req_data = json.dumps(payload).encode('utf-8')
+            req = urllib.request.Request(
+                url,
+                data=req_data,
+                headers={
+                    "xi-api-key": api_key,
+                    "Content-Type": "application/json"
+                },
+                method="POST"
+            )
+            try:
+                with urllib.request.urlopen(req) as response:
+                    return response.read()
+            except Exception as e:
+                print(f"[!] ElevenLabs error: {e}. Falling back to Google TTS...")
+                pass
+    
+    # Google Translate TTS fallback
+    words = clean_text.split()
+    chunks = []
+    current_chunk = []
+    current_len = 0
+    for word in words:
+        if current_len + len(word) + 1 > 180:
+            chunks.append(" ".join(current_chunk))
+            current_chunk = [word]
+            current_len = len(word)
+        else:
+            current_chunk.append(word)
+            current_len += len(word) + 1
+    if current_chunk:
+        chunks.append(" ".join(current_chunk))
+    
+    audio_bytes = b""
+    for chunk in chunks:
+        if not chunk.strip():
+            continue
+        encoded_query = urllib.parse.quote(chunk)
+        url = f"https://translate.google.com/translate_tts?ie=UTF-8&tl=sw&client=tw-ob&q={encoded_query}"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        try:
+            with urllib.request.urlopen(req) as r:
+                audio_bytes += r.read()
+        except Exception as e:
+            print(f"[!] Google TTS fetch error: {e}")
+            pass
+    return audio_bytes
+
+def resolve_persona_prompt(persona_id):
+    """Retrieve the custom system prompt associated with a specific persona."""
+    if not persona_id or persona_id == "default":
+        default_path = os.path.join(os.path.dirname(__file__), "personas", "default.json")
+        if os.path.exists(default_path):
+            try:
+                with open(default_path, "r", encoding="utf-8") as f:
+                    return json.load(f).get("prompt", SYSTEM_PROMPT)
+            except Exception:
+                pass
+        return SYSTEM_PROMPT
+    
+    persona_path = os.path.join(os.path.dirname(__file__), "personas", f"{persona_id}.json")
+    if os.path.exists(persona_path):
+        try:
+            with open(persona_path, "r", encoding="utf-8") as f:
+                return json.load(f).get("prompt", SYSTEM_PROMPT)
+        except Exception:
+            pass
+    return SYSTEM_PROMPT
+
+def generate_chat_telemetry(message, response, persona_id):
+    """Generate realistic logic flow events and telemetry settings for UI visual analytics."""
+    now_str = datetime.now().strftime("%H:%M:%S")
+    logs = []
+    
+    logs.append(f"STT: Capture completed for input '{message}'")
+    
+    # Basic keyword mapping for intent simulation
+    msg_lower = message.lower()
+    intent = "Ufafanuzi wa Jumla" # General inquiry
+    db_action = "Database: Kupakia maelezo ya mteja (Jane Dinah)..."
+    
+    if not is_in_boundary(message):
+        intent = "Out of Boundary"
+        db_action = "Routing: Blocking out-of-bounds context request..."
+    elif "mhudumu" in msg_lower or "binadamu" in msg_lower or "ongea" in msg_lower or "human" in msg_lower or "agent" in msg_lower:
+        intent = "Human Agent Escalation"
+        db_action = "Routing: Connecting caller session to a live human agent queue..."
+    elif "salio" in msg_lower or "pesa" in msg_lower or "fedha" in msg_lower or "shilingi" in msg_lower or "tuma" in msg_lower or "balance" in msg_lower:
+        intent = "Balance & M-Pesa Inquiry"
+        db_action = "Database: Querying MSISDN balances, airtime ledgers, and transaction status..."
+    elif "bando" in msg_lower or "mb" in msg_lower or "vifurushi" in msg_lower or "internet" in msg_lower:
+        intent = "Bundle Entitlements"
+        db_action = "Database: Kuhakiki vifurushi amilifu na historia ya ununuzi..."
+    elif "nida" in msg_lower or "namba" in msg_lower or "kitambulisho" in msg_lower:
+        intent = "NIDA ID Validation"
+        db_action = "Database: Kushirikiana na mamlaka ya NIDA kuhakiki kitambulisho..."
+    elif "sajili" in msg_lower or "laini" in msg_lower or "sim" in msg_lower:
+        intent = "SIM Registry Validation"
+        db_action = "Database: Kuhakiki usajili wa namba na namba ya IMSI..."
+
+
+    logs.append(f"NLP: Intent classified as '{intent}' under persona '{persona_id}'")
+    logs.append(db_action)
+    logs.append(f"LLM: Kutuma ombi kwenye mtandao wa {MODEL_ENGINE.upper()} API...")
+    logs.append(f"LLM: Majibu yamekamilika kwa kutumia model '{MODEL_NAME}'")
+    
+    provider = os.environ.get("TTS_PROVIDER", "google").lower()
+    logs.append(f"TTS: Kusanidi sauti ya Kiswahili kwa kutumia {provider.upper()}...")
+
+    telemetry = {
+        "engine": MODEL_ENGINE,
+        "model": MODEL_NAME,
+        "tts_provider": provider,
+        "timestamp": now_str,
+        "intent": intent
+    }
+    
+    return logs, telemetry
+
+def run_api_server(port=5000):
+    """Run built-in standard library HTTP server with CORS enabled."""
+    from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+    import urllib.parse
+    
+    def send_cors_headers(handler):
+        handler.send_header('Access-Control-Allow-Origin', '*')
+        handler.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        handler.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        handler.send_header('Connection', 'close')
+
+    class SwahiliAssistantRequestHandler(BaseHTTPRequestHandler):
+        def do_OPTIONS(self):
+            self.send_response(200)
+            send_cors_headers(self)
+            self.end_headers()
+
+        def do_GET(self):
+            try:
+                parsed_path = urllib.parse.urlparse(self.path)
+                path = parsed_path.path
+                query = urllib.parse.parse_qs(parsed_path.query)
+
+                if path == "/api/personas":
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    send_cors_headers(self)
+                    self.end_headers()
+                    
+                    personas = []
+                    # Always append the default persona
+                    personas.append({
+                        "id": "default",
+                        "name": "Ana Standard",
+                        "description": "Msaidizi mkuu wa Kiswahili binafsi."
+                    })
+                    
+                    personas_dir = os.path.join(os.path.dirname(__file__), "personas")
+                    if os.path.exists(personas_dir):
+                        for filename in os.listdir(personas_dir):
+                            if filename.endswith(".json") and filename != "default.json":
+                                p_path = os.path.join(personas_dir, filename)
+                                try:
+                                    with open(p_path, "r", encoding="utf-8") as f:
+                                        data = json.load(f)
+                                        personas.append({
+                                            "id": filename[:-5],
+                                            "name": data.get("name", filename[:-5]),
+                                            "description": data.get("description", "")
+                                        })
+                                except Exception:
+                                    pass
+                    
+                    self.wfile.write(json.dumps(personas).encode('utf-8'))
+
+                elif path == "/api/tts":
+                    text = query.get("text", [""])[0]
+                    if not text:
+                        self.send_response(400)
+                        send_cors_headers(self)
+                        self.end_headers()
+                        self.wfile.write(b"Missing text parameter")
+                        return
+                    
+                    self.send_response(200)
+                    self.send_header('Content-type', 'audio/mpeg')
+                    send_cors_headers(self)
+                    self.end_headers()
+                    
+                    audio_bytes = get_tts_bytes(text)
+                    self.wfile.write(audio_bytes)
+
+                else:
+                    self.send_response(404)
+                    send_cors_headers(self)
+                    self.end_headers()
+                    self.wfile.write(b"Not Found")
+            except Exception as e:
+                import traceback
+                print(f"[API Server Error] do_GET failed: {e}")
+                traceback.print_exc()
+                try:
+                    self.send_response(500)
+                    send_cors_headers(self)
+                    self.end_headers()
+                    self.wfile.write(f"Internal server error: {e}".encode('utf-8'))
+                except Exception:
+                    pass
+
+        def do_POST(self):
+            try:
+                parsed_path = urllib.parse.urlparse(self.path)
+                path = parsed_path.path
+
+                if path == "/api/chat":
+                    content_length = int(self.headers['Content-Length'])
+                    post_data = self.rfile.read(content_length)
+                    try:
+                        data = json.loads(post_data.decode('utf-8'))
+                    except Exception:
+                        self.send_response(400)
+                        send_cors_headers(self)
+                        self.end_headers()
+                        self.wfile.write(b"Invalid JSON")
+                        return
+
+                    message = data.get("message", "")
+                    persona_id = data.get("persona", "default")
+                    history = data.get("history", [])
+
+                    if not message:
+                        self.send_response(400)
+                        send_cors_headers(self)
+                        self.end_headers()
+                        self.wfile.write(b"Missing message parameter")
+                        return
+
+                    # Load custom persona prompt
+                    global SYSTEM_PROMPT
+                    original_prompt = SYSTEM_PROMPT
+                    SYSTEM_PROMPT = resolve_persona_prompt(persona_id)
+
+                    # Format chat history
+                    chat_history = []
+                    for h in history:
+                        chat_history.append({"role": h.get("role"), "content": h.get("content")})
+                    chat_history.append({"role": "user", "content": message})
+
+                    # Query LLM (stream=False is required for HTTP response)
+                    response_text = generate_response(chat_history, stream=False)
+
+                    # Restore original prompt
+                    SYSTEM_PROMPT = original_prompt
+
+                    # Get telemetry logs
+                    logs, telemetry = generate_chat_telemetry(message, response_text, persona_id)
+
+                    should_close = response_text in [
+                        "Asante kwa muda wako, karibu tena.",
+                        "Sawa, karibu tena."
+                    ]
+
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    send_cors_headers(self)
+                    self.end_headers()
+
+                    result = {
+                        "response": response_text,
+                        "logs": logs,
+                        "telemetry": telemetry,
+                        "should_close": should_close
+                    }
+                    self.wfile.write(json.dumps(result).encode('utf-8'))
+                else:
+                    self.send_response(404)
+                    send_cors_headers(self)
+                    self.end_headers()
+                    self.wfile.write(b"Not Found")
+            except Exception as e:
+                import traceback
+                print(f"[API Server Error] do_POST failed: {e}")
+                traceback.print_exc()
+                try:
+                    self.send_response(500)
+                    send_cors_headers(self)
+                    self.end_headers()
+                    self.wfile.write(f"Internal server error: {e}".encode('utf-8'))
+                except Exception:
+                    pass
+
+    print(f"\n{C_CYAN}[A.N.A API Server] Running on http://127.0.0.1:{port}{C_RESET}")
+    print(f"{C_GRAY}Press Ctrl+C to terminate...{C_RESET}\n")
+    server = ThreadingHTTPServer(('127.0.0.1', port), SwahiliAssistantRequestHandler)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print(f"\n{C_YELLOW}[!] API Server shutting down...{C_RESET}")
+        server.server_close()
+
 def main():
     global SPEAK_ENABLED
     parser = argparse.ArgumentParser(description="A.N.A Swahili Neural CLI Assistant Core")
@@ -459,6 +882,10 @@ def main():
                         help="Weka jina la persona ya kupakia (default, mwalimu, mhandisi)")
     parser.add_argument("-s", "--speak", action="store_true", 
                         help="Washa sauti ya A.N.A ili kuongea majibu aloud")
+    parser.add_argument("--server", action="store_true", 
+                        help="Anzisha server ya HTTP API kwa ajili ya Frontend")
+    parser.add_argument("--port", type=int, default=5000, 
+                        help="Port kwa ajili ya server (chaguo-msingi: 5000)")
     args = parser.parse_args()
 
     print(BANNER)
@@ -475,6 +902,11 @@ def main():
     if not detect_engine():
         sys.exit(1)
     print()
+
+    if args.server:
+        SPEAK_ENABLED = False
+        run_api_server(args.port)
+        sys.exit(0)
 
     if args.prompt:
         messages = [{"role": "user", "content": args.prompt}]
